@@ -1,0 +1,65 @@
+;; Filename: TolkRicochetProcessor.tlk
+;; Contract A: Accepts an external message, sends an internal message to Contract B, and handles the resulting RichBounce.
+;; 合约 A：接受外部消息，发送内部消息给合约 B，并处理 RichBounce 回弹。
+
+;; Include the standard library
+#include "stdlib.tlk"
+
+;; Function to receive and process the RichBounce
+() receive_ricochet_message(cell body) impure inline {
+    ;; Store the RichBounce message body in c3 for inspection
+    c3 = body;
+    
+    ;; Log that the RichBounce was successfully caught
+    "RichBounce (Ricochet) caught and processed by Processor A!" print;
+    
+    ;; You can add state modification logic here based on the 'body'
+    return;
+}
+
+;; Main receiver function, handles all incoming messages
+() recv_internal(int balance, int msg_value, cell in_msg_full, cell in_msg_body) impure {
+    
+    ;; Parse the message header
+    slice in_msg = in_msg_full.begin_parse();
+    int flags = in_msg.load_uint(6); ;; Load message flags (6 bits)
+    
+    ;; Check if the message is a bounce/richbounce (flag 0 is set)
+    if (flags & 1) {
+        ;; It is a bounce message.
+        
+        ;; Call the RichBounce handler
+        receive_ricochet_message(in_msg_body);
+        "Processed Ricochet in TolkRicochetProcessor." print;
+        return;
+    }
+    
+    ;; --- Normal Message Processing Logic ---
+    
+    ;; Target address of Contract B (Replace with actual deployed address)
+    ;; 合约 B 的目标地址 (请替换为实际部署的地址)
+    cell b_addr_cell = begin_cell().store_uint(0x20B11A2C, 32).end_cell(); 
+    slice b_addr = b_addr_cell.begin_parse();
+
+    ;; Create the message body for Contract B
+    cell out_body = begin_cell()
+        .store_uint(0xBADF00D, 32) ;; Unique op code
+        .store_ref(in_msg_body)    ;; Store the original message body as reference data
+        .end_cell();
+
+    ;; Create the outgoing message header and body
+    ;; Flags: Mode 1 (send all remaining TON) and bounceable is implicit or set by mode.
+    cell out_msg = begin_cell()
+        .store_slice(b_addr)
+        .store_coins(0)             ;; value (0 used with mode 1)
+        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; Skip fields up to 'init'
+        .store_uint(0, 1)           ;; no init
+        .store_uint(0, 1)           ;; no data
+        .store_ref(out_body)        ;; The message body
+        .end_cell();
+
+    ;; Send the message using mode 129 (1 | 128)
+    send_raw_message(out_msg, 129);
+
+    "TolkRicochetProcessor sent message to TolkErrorEmitter. Expecting Ricochet..." print;
+}
