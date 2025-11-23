@@ -1,0 +1,33 @@
+;; Filename: TolkErrorEmitter.tlk
+;; Contract B: Accepts any internal message and always throws an error to trigger a RichBounce.
+;; 合约 B：接受任何内部消息，并总是抛出错误以触发 RichBounce。
+
+#include "stdlib.tlk"
+
+;; Main receiver function, handles all incoming messages
+() recv_internal(int balance, int msg_value, cell in_msg_full, cell in_msg_body) impure {
+    
+    ;; Parse the message for flags
+    slice in_msg = in_msg_full.begin_parse();
+    int flags = in_msg.load_uint(6);
+    
+    ;; Ignore incoming bounce messages to prevent loops
+    ;; 忽略回弹消息以防止循环
+    if (flags & 1) {
+        "TolkErrorEmitter ignored incoming bounce message." print;
+        return;
+    }
+    
+    ;; --- RichBounce Trigger Logic ---
+    
+    "TolkErrorEmitter received message. Intentionally throwing error to trigger RichBounce..." print;
+    
+    ;; **Key action:** Executing 'throw' aborts the transaction.
+    ;; The TON Virtual Machine automatically generates and sends a RichBounce message 
+    ;; back to the sender because the incoming message was bounceable.
+    
+    ;; Throw a custom error code (e.g., 777)
+    throw(777); 
+    
+    ;; Code after throw will not be executed
+}
